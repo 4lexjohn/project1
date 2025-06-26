@@ -75,6 +75,93 @@ We can check the alert using wazuh
 
 
 
+Integrating virus total to wazuh 
+Step 1) https://www.virustotal.com/  
+ sign up to the website and check for API key copy the key
+ 
+step 2) add to the /var/ossec/etc/ossec.conf file on the Wazuh server:
+
+<integration>
+  <name>virustotal</name>
+  <api_key>API_KEY</api_key> <!-- Replace with your VirusTotal API key -->
+  <group>syscheck</group>
+  <alert_format>json</alert_format>
+</integration>
+
+Step 3) on the agent.conf file add 
+
+<syscheck>
+  <directories check_all="yes" realtime="yes">/media/user/software</directories>
+</syscheck>
+
+Step 4) After applying the configuration, you must restart the Wazuh manager:
+
+systemctl restart wazuh-manager
+
+step 5) Test the configuration 
+Now, you can download a malicious file on the endpoint in the monitored folder.
+
+sudo curl -Lo /media/user/software/suspicious-file.exe https://secure.eicar.org/eicar.com
+
+step 6) the file should be flagged  as malicious on wazuh 
+
+Detecting and removing malware using VirusTotal integration:
+Step 1) Install jq, a utility that processes JSON input from the active response script.
+
+$ sudo apt update
+     $ sudo apt -y install jq
+1.	Step 2) Add the following rules to the /var/ossec/etc/rules/local_rules.xml file on the Wazuh server. These rules alert about changes in the /root directory that are detected by FIM scans:
+2.	
+<group name="syscheck,pci_dss_11.5,nist_800_53_SI.7,">
+    <!-- Rules for Linux systems -->
+    <rule id="100200" level="7">
+        <if_sid>550</if_sid>
+        <field name="file">/root</field>
+        <description>File modified in /root directory.</description>
+    </rule>
+    <rule id="100201" level="7">
+        <if_sid>554</if_sid>
+        <field name="file">/root</field>
+        <description>File added to /root directory.</description>
+    </rule>
+               </group>
+               
+Step 3) Add the following configuration to the Wazuh server /var/ossec/etc/ossec.conf file to enable the Virustotal integration. Replace <YOUR_VIRUS_TOTAL_API_KEY> with your VirusTotal API key. This allows to trigger a VirusTotal query whenever any of the rules <rule id> are triggered:
+
+<ossec_config>
+  <integration>
+    <name>virustotal</name>
+    <api_key><YOUR_VIRUS_TOTAL_API_KEY></api_key> <!-- Replace with your VirusTotal API key -->
+    <rule_id>your rule id</rule_id>
+    <alert_format>json</alert_format>
+  </integration>
+</ossec_config>
+     
+Step 4) Append the following blocks to the Wazuh server /var/ossec/etc/ossec.conf file. This enables Active Response and triggers the remove-threat.sh script when VirusTotal flags a file as malicious:
+
+<ossec_config>
+  <command>
+    <name>remove-threat</name>
+    <executable>remove-threat.sh</executable>
+    <timeout_allowed>no</timeout_allowed>
+  </command>
+
+  <active-response>
+    <disabled>no</disabled>
+    <command>remove-threat</command>
+    <location>local</location>
+    <rules_id>87105</rules_id>
+  </active-response>
+        </ossec_config>
+        
+Step 5) Restart the Wazuh manager to apply the configuration changes:
+
+$ sudo systemctl restart wazuh-manager
+
+
+
+
+
 
 
 
